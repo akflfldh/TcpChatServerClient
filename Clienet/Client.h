@@ -10,7 +10,8 @@
 
 #include"Packet.h"
 #include"ClientCharacterTable.h"
-
+#include"InputChatComponent.h"
+#include"InputCharacterComponent.h"
 
 
 #define ServerIp "192.168.0.102"
@@ -40,25 +41,31 @@ public:
 	void HandleAckChatString(Packet* packet);
 	void HandleReqDisCon(Packet* packet);
 	void HandleAckDisCon(Packet* packet);
+	
 
 
 private:
 
 	void AddNewChat(const std::string& str);
 	void AddNewChat(std::string&& str);
-
+	
+	static void InputLoop();
 
 private:
 	SOCKET mSocket;
 	UserID mUserID;
 	ClientCharacterTable mClientCharacterTable;
+	InputChatComponent mInputChatComponent;
+	InputCharacterComponent mInputCharacterComponent;
 
 
+	HANDLE mConnectServerEvent;
 	bool mRecvLoopFlag = true;
-	bool mConnectServer = false;
 	bool mMainLoopFlag = true;
 	bool mInputLoopFlag = true;
 	bool mNewChatFlag = true;
+
+
 
 	HWND foregroundWindow;
 	HANDLE mStringOutputMutex;
@@ -66,5 +73,7 @@ private:
 	std::string mStringArray[10];
 	std::string mStringBlank[10];
 
+
+	unsigned long mUpdateVersionNum;
 };
 
