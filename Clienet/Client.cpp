@@ -15,18 +15,11 @@ Client::Client()
 bool Client::Initialize()
 {
     //해제하는부분은 소멸자에서 조건따져서 해제해야하는거다.
-    mStringOutputMutex = CreateMutex(nullptr, false, L"");
-    if (mStringOutputMutex == NULL)
-    {
-        return false;
-    }
     mConnectServerEvent = CreateEvent(nullptr, false, false, L"");
     if (mConnectServerEvent == NULL)
     {
-        CloseHandle(mStringOutputMutex);
+        return false;
     }
-
-
 
     WSAData wsaData;
 
@@ -151,6 +144,15 @@ DWORD Client::InputThread(LPVOID lpParam)
     delete reqConPacket;
     reqConPacket = nullptr;
 
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole == INVALID_HANDLE_VALUE) {
+        // 오류 코드를 출력합니다.
+        DWORD dwError = GetLastError();
+        printf("Failed to get standard output handle. Error code: %lu\n", dwError);
+        return 0;
+    }
+    instance->mConsoleHandle = hConsole;
+
     WaitForSingleObject(instance->mConnectServerEvent, INFINITE);
 
     InputLoop();
@@ -222,7 +224,7 @@ void Client::HandleAckCon(Packet* packet)
     oStringStream << systemTime.wYear << "년 " << systemTime.wMonth << "월 " << systemTime.wDay << "일 "
         << systemTime.wHour << "시 " << systemTime.wMinute << "분 " << systemTime.wSecond << "초에" << userID <<
         "가 접속했습니다.";
-    AddNewChat(oStringStream.str());
+    OutputNewChat(oStringStream.str());
 
     if (mUserID == userID)
     {
@@ -269,7 +271,7 @@ void Client::HandleAckMove(Packet* packet)
 
         std::ostringstream oStringStream;
         oStringStream << "[" << userID << "] 의 위치이동" << "(" << position.mPosX << "," << position.mPosY << "," << position.mPosZ << ")";
-        AddNewChat(oStringStream.str());
+        OutputNewChat(oStringStream.str());
         //내가갱신할수있는상태면갱신을하는데(즉 나의 pc에반영이된다 (결국최대한번))
         //그다음번업데이트는 내가 보낸패킷을 내가 받은후에 가능하다.(업데이트불가능)(버전으로 관리한다))
         //아니면 화면에는 보이지않게? 기존의값만 계속출력된느거지 새로운것이 화면에 렌더링되지않는다.
@@ -297,7 +299,7 @@ void Client::HandleAckChatString(Packet* packet)
 
     std::ostringstream oStringStream;
     oStringStream << "[" << userID << "] : " << stringPacket->GetData();
-    AddNewChat(oStringStream.str());
+    OutputNewChat(oStringStream.str());
 }
 
 
@@ -333,13 +335,13 @@ void Client::HandleAckDisCon(Packet* packet)
     oStringStream << systemTime.wYear << "년 " << systemTime.wMonth << "월 " << systemTime.wDay << "일 "
         << systemTime.wHour << "시 " << systemTime.wMinute << "분 " << systemTime.wSecond << "초에" << userID <<
         "가 접속해제했습니다.";
-    AddNewChat(oStringStream.str());
+    OutputNewChat(oStringStream.str());
     
 }
 
-void Client::AddNewChat(const std::string& str)
+void Client::OutputNewChat(const std::string& str)
 {
-    WaitForSingleObject(mStringOutputMutex, INFINITE);
+   // WaitForSingleObject(mStringOutputMutex, INFINITE);
 
     for (int i = 0; i < 9; ++i)
     {
@@ -350,23 +352,34 @@ void Client::AddNewChat(const std::string& str)
 
     for (int i = 0; i < 9; ++i)
     {
-        
-        mStringArray[i]=   std::move(mStringArray[i + 1]);
+
+        mStringArray[i] = std::move(mStringArray[i + 1]);
     }
     mStringArray[9] = str;
+
+    SetConsoleCursorPosition(mConsoleHandle, { 0,0 });
+
+    for (int i = 0; i < 10; ++i)
+    {
+        std::cout << mStringBlank[i] << std::endl;
+    }
  //   mStringBlank[9].resize(mStringArray[9].size(),' ');
-   
+    SetConsoleCursorPosition(mConsoleHandle, { 0,0 });
+    for (int i = 0; i < 10; ++i)
+    {
+        std::cout << mStringArray[i] << std::endl;
+    }
 
-    mNewChatFlag = true;
+    //mNewChatFlag = true;
 
 
 
-    ReleaseMutex(mStringOutputMutex);
+    //ReleaseMutex(mStringOutputMutex);
 }
 
-void Client::AddNewChat(std::string&& str)
+void Client::OutputNewChat(std::string&& str)
 {
-    WaitForSingleObject(mStringOutputMutex, INFINITE);
+    //WaitForSingleObject(mStringOutputMutex, INFINITE);
     
     for (int i = 0; i < 9; ++i)
     {
@@ -376,12 +389,24 @@ void Client::AddNewChat(std::string&& str)
 
     for (int i = 0; i < 9; ++i)
     {
-        mStringArray[i] = std::move(mStringArray[i+1]);
+        mStringArray[i] = std::move(mStringArray[i + 1]);
     }
     mStringArray[9] = std::move(str);
-   
-    mNewChatFlag = true;
-    ReleaseMutex(mStringOutputMutex);
+
+    SetConsoleCursorPosition(mConsoleHandle, { 0,0 });
+
+    for (int i = 0; i < 10; ++i)
+    {
+        std::cout << mStringBlank[i] << std::endl;
+    }
+    SetConsoleCursorPosition(mConsoleHandle, { 0,0 });
+    for (int i = 0; i < 10; ++i)
+    {
+        std::cout << mStringArray[i] << std::endl;
+    }
+
+    //mNewChatFlag = true;
+    //ReleaseMutex(mStringOutputMutex);
 }
 
 void Client::InputLoop()
@@ -393,14 +418,6 @@ void Client::InputLoop()
     instance->mClientCharacterTable.ReadEnd();
 
 
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hConsole == INVALID_HANDLE_VALUE) {
-        // 오류 코드를 출력합니다.
-        DWORD dwError = GetLastError();
-        printf("Failed to get standard output handle. Error code: %lu\n", dwError);
-        return;
-    }
-
 
     std::string str;
     bool chatFlag = true;
@@ -408,8 +425,8 @@ void Client::InputLoop()
 
     instance->mUpdateVersionNum = 1;
     instance->foregroundWindow = GetForegroundWindow();
-    SetConsoleCursorPosition(hConsole, { 0,10 });
-    instance->mInputChatComponent.Initialize(instance, hConsole, instance->mUserID);
+    SetConsoleCursorPosition(instance->mConsoleHandle, { 0,10 });
+    instance->mInputChatComponent.Initialize(instance, instance->mConsoleHandle, instance->mUserID);
     instance->mInputCharacterComponent.Initialize(instance, instance->mUserID);
 
     while (instance->mInputLoopFlag)
@@ -451,25 +468,6 @@ void Client::InputLoop()
             {
                 instance->mInputCharacterComponent.Update(characterState, instance->mUpdateVersionNum, preUpdateVersionNum);
             }
-        }
-
-        if (instance->mNewChatFlag)
-        {
-
-            SetConsoleCursorPosition(hConsole, { 0,0 });
-            WaitForSingleObject(instance->mStringOutputMutex, INFINITE);
-
-            for (int i = 0; i < 10; ++i)
-            {
-                std::cout << instance->mStringBlank[i] << std::endl;
-            }
-            SetConsoleCursorPosition(hConsole, { 0,0 });
-            for (int i = 0; i < 10; ++i)
-            {
-                std::cout << instance->mStringArray[i] << std::endl;
-            }
-            instance->mNewChatFlag = false;
-            ReleaseMutex(instance->mStringOutputMutex);
         }
 
     }

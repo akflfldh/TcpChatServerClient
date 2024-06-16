@@ -14,7 +14,7 @@
 #include"InputCharacterComponent.h"
 
 
-#define ServerIp "192.168.0.102"
+#define ServerIp "192.168.232.213"
 
 
 
@@ -46,8 +46,8 @@ public:
 
 private:
 
-	void AddNewChat(const std::string& str);
-	void AddNewChat(std::string&& str);
+	void OutputNewChat(const std::string& str);
+	void OutputNewChat(std::string&& str);
 	
 	static void InputLoop();
 
@@ -68,12 +68,14 @@ private:
 
 
 	HWND foregroundWindow;
-	HANDLE mStringOutputMutex;
+	//HANDLE mStringOutputMutex;
 	
 	std::string mStringArray[10];
 	std::string mStringBlank[10];
 
 
 	unsigned long mUpdateVersionNum;
+
+	HANDLE mConsoleHandle;
 };
 
